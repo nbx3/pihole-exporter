@@ -1,0 +1,12 @@
+# Nim build artifacts
+nimcache/
+src/nimcache/
+pihole_exporter
+src/pihole_exporter_bin
+*.exe
+*.o
+*.a
+
+# Nimble
+nimble.develop
+nimble.paths

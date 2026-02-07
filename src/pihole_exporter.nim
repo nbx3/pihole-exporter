@@ -1,0 +1,81 @@
+## Pi-hole Prometheus Exporter — comprehensive exporter for Pi-hole v6.
+## Configured via environment variables, serves Prometheus metrics on /metrics.
+
+import std/[asyncdispatch, asynchttpserver, os, strutils, strformat, logging]
+import pihole_exporter/[client, collector]
+
+type
+  Config = object
+    piholeUrl: string
+    piholePassword: string
+    piholePort: int
+    exporterPort: int
+    skipTlsVerify: bool
+
+proc loadConfig(): Config =
+  let url = getEnv("PIHOLE_URL", "http://localhost")
+  let password = getEnv("PIHOLE_PASSWORD", "")
+  if password == "":
+    error("PIHOLE_PASSWORD environment variable is required")
+    quit(1)
+  let piholePort = getEnv("PIHOLE_PORT", "80").parseInt()
+  let exporterPort = getEnv("EXPORTER_PORT", "9617").parseInt()
+  let skipTls = getEnv("SKIP_TLS_VERIFY", "false").toLowerAscii() in ["true", "1", "yes"]
+
+  # Build base URL: append port to URL
+  var baseUrl = url.strip(chars = {'/'})
+  if ":" notin baseUrl.split("//", 1)[^1]:
+    baseUrl = &"{baseUrl}:{piholePort}"
+
+  Config(
+    piholeUrl: baseUrl,
+    piholePassword: password,
+    piholePort: piholePort,
+    exporterPort: exporterPort,
+    skipTlsVerify: skipTls,
+  )
+
+const landingPage = """<!DOCTYPE html>
+<html><head><title>Pi-hole Exporter</title></head>
+<body><h1>Pi-hole Exporter</h1><p><a href="/metrics">Metrics</a></p></body>
+</html>"""
+
+proc main() {.async.} =
+  let logger = newConsoleLogger(fmtStr = "$datetime $levelname ")
+  addHandler(logger)
+
+  let cfg = loadConfig()
+  info(&"Pi-hole Exporter starting")
+  info(&"  Pi-hole URL: {cfg.piholeUrl}")
+  info(&"  Exporter port: {cfg.exporterPort}")
+  info(&"  Skip TLS verify: {cfg.skipTlsVerify}")
+
+  let piholeClient = newPiholeClient(cfg.piholeUrl, cfg.piholePassword,
+    cfg.skipTlsVerify)
+
+  var server = newAsyncHttpServer()
+
+  proc handler(req: Request) {.async.} =
+    case req.url.path
+    of "/metrics":
+      let body = await piholeClient.collect()
+      await req.respond(Http200, body,
+        newHttpHeaders({"Content-Type": "text/plain; version=0.0.4; charset=utf-8"}))
+    of "/health":
+      await req.respond(Http200, "OK")
+    of "/":
+      await req.respond(Http200, landingPage,
+        newHttpHeaders({"Content-Type": "text/html"}))
+    else:
+      await req.respond(Http404, "Not Found")
+
+  info(&"Listening on :{cfg.exporterPort}")
+  server.listen(Port(cfg.exporterPort))
+  while true:
+    if server.shouldAcceptRequest():
+      await server.acceptRequest(handler)
+    else:
+      await sleepAsync(500)
+
+when isMainModule:
+  waitFor main()
