@@ -18,11 +18,12 @@ proc loadConfig(): Config =
   if password == "":
     error("PIHOLE_PASSWORD environment variable is required")
     quit(1)
-  let piholePort = getEnv("PIHOLE_PORT", "80").parseInt()
+  let defaultPort = if url.startsWith("https"): "443" else: "80"
+  let piholePort = getEnv("PIHOLE_PORT", defaultPort).parseInt()
   let exporterPort = getEnv("EXPORTER_PORT", "9617").parseInt()
   let skipTls = getEnv("SKIP_TLS_VERIFY", "false").toLowerAscii() in ["true", "1", "yes"]
 
-  # Build base URL: append port to URL
+  # Build base URL: append port to URL if not already present
   var baseUrl = url.strip(chars = {'/'})
   if ":" notin baseUrl.split("//", 1)[^1]:
     baseUrl = &"{baseUrl}:{piholePort}"
