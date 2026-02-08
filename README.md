@@ -86,6 +86,7 @@ All configuration is via environment variables:
 | `PIHOLE_PORT` | `443` or `80` | Pi-hole port (defaults to `443` for HTTPS URLs, `80` for HTTP; appended if no port present) |
 | `EXPORTER_PORT` | `9617` | Metrics server listen port |
 | `SKIP_TLS_VERIFY` | `false` | Skip TLS certificate verification |
+| `LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `NONE` |
 
 ## Endpoints
 

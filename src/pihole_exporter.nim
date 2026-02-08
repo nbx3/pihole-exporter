@@ -42,7 +42,16 @@ const landingPage = """<!DOCTYPE html>
 </html>"""
 
 proc main() {.async.} =
-  let logger = newConsoleLogger(fmtStr = "$datetime $levelname ")
+  let levelStr = getEnv("LOG_LEVEL", "INFO").toUpperAscii()
+  let level = case levelStr
+    of "DEBUG": lvlDebug
+    of "INFO": lvlInfo
+    of "WARN", "WARNING": lvlWarn
+    of "ERROR": lvlError
+    of "FATAL": lvlFatal
+    of "NONE": lvlNone
+    else: lvlInfo
+  let logger = newConsoleLogger(level, fmtStr = "$datetime $levelname ")
   addHandler(logger)
 
   info("Pi-hole Exporter starting")
