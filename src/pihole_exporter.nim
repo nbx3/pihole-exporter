@@ -4,6 +4,8 @@
 import std/[asyncdispatch, asynchttpserver, os, strutils, strformat, logging, times]
 import pihole_exporter/[client, collector]
 
+const Version {.strdefine.} = "dev"
+
 type
   Config = object
     piholeUrl: string
@@ -58,7 +60,7 @@ proc main() {.async.} =
   let logger = newConsoleLogger(level, fmtStr = "$datetime $levelname ")
   addHandler(logger)
 
-  info("Pi-hole Exporter starting")
+  info(&"Pi-hole Exporter {Version} starting")
   let cfg = loadConfig()
   info(&"  Pi-hole URL: {cfg.piholeUrl}")
   info(&"  Exporter port: {cfg.exporterPort}")
