@@ -16,7 +16,7 @@ suite "collectSummary":
         "frequency": 1.5
       },
       "clients": {"total": 50, "active": 20},
-      "gravity_size": 100000
+      "gravity": {"domains_being_blocked": 100000}
     }
     """)
     b.collectSummary(data)
@@ -36,11 +36,11 @@ suite "collectSummary":
     let data = parseJson("""
     {
       "queries": {"total": 100, "blocked": 10, "percent_blocked": 10.0,
-                  "unique_domains": 50, "forwarded": 80, "cached": 10, "frequency": 0.5},
+                  "unique_domains": 50, "forwarded": 80, "cached": 10, "frequency": 0.5,
+                  "types": {"A": 60, "AAAA": 40},
+                  "replies": {"NODATA": 5, "NXDOMAIN": 2}},
       "clients": {"total": 5, "active": 3},
-      "gravity_size": 1000,
-      "query_types": {"A": 60, "AAAA": 40},
-      "reply_types": {"NODATA": 5, "NXDOMAIN": 2}
+      "gravity": {"domains_being_blocked": 1000}
     }
     """)
     b.collectSummary(data)
@@ -99,11 +99,11 @@ suite "collectTopDomains":
     check b.output() == ""
 
 suite "collectUpstreams":
-  test "response time converted to seconds":
+  test "response time in seconds":
     var b = newMetricsBuilder()
     let data = parseJson("""
     {"upstreams": [{"ip": "1.1.1.1", "name": "cloudflare",
-                    "count": 5000, "response_time": 25.5}]}
+                    "count": 5000, "statistics": {"response": 0.0255}}]}
     """)
     b.collectUpstreams(data)
     let output = b.output()
@@ -118,15 +118,15 @@ suite "collectUpstreams":
 suite "collectVersion":
   test "version fields":
     var b = newMetricsBuilder()
-    let data = parseJson("""{"version": "6.0", "web": "6.0", "core": "6.0"}""")
+    let data = parseJson("""
+    {"version": {
+      "ftl": {"local": {"version": "6.0"}},
+      "web": {"local": {"version": "6.0"}},
+      "core": {"local": {"version": "6.0"}}
+    }}
+    """)
     b.collectVersion(data)
     check "pihole_version_info{ftl=\"6.0\",web=\"6.0\",core=\"6.0\"} 1" in b.output()
-
-  test "fallback to ftl field":
-    var b = newMetricsBuilder()
-    let data = parseJson("""{"ftl": "5.25", "web": "5.21", "core": "5.18"}""")
-    b.collectVersion(data)
-    check "ftl=\"5.25\"" in b.output()
 
   test "JNull produces no output":
     var b = newMetricsBuilder()
@@ -137,9 +137,11 @@ suite "collectSystem":
   test "memory percentage calculation":
     var b = newMetricsBuilder()
     let system = parseJson("""
-    {"uptime": 86400,
-     "memory": {"ram": {"used": 512, "total": 1024}},
-     "cpu": {"percent_used": 15.5}}
+    {"system": {
+      "uptime": 86400,
+      "memory": {"ram": {"used": 512, "total": 1024}},
+      "cpu": {"%cpu": 15.5}
+    }}
     """)
     b.collectSystem(system, newJNull())
     let output = b.output()
@@ -220,9 +222,12 @@ suite "collectFtl":
   test "FTL info with database stats":
     var b = newMetricsBuilder()
     let data = parseJson("""
-    {"pid": 1234,
-     "database": {"gravity": 100000, "groups": 5,
-                  "lists": 10, "clients": 25, "domains": 50}}
+    {"ftl": {
+      "pid": 1234,
+      "database": {"gravity": 100000, "groups": 5,
+                   "lists": 10, "clients": 25,
+                   "domains": {"allowed": {"total": 30}, "denied": {"total": 20}}}
+    }}
     """)
     b.collectFtl(data)
     let output = b.output()
@@ -231,7 +236,8 @@ suite "collectFtl":
     check "pihole_ftl_database_groups 5" in output
     check "pihole_ftl_database_lists 10" in output
     check "pihole_ftl_database_clients 25" in output
-    check "pihole_ftl_database_domains 50" in output
+    check "pihole_ftl_database_domains_allowed 30" in output
+    check "pihole_ftl_database_domains_denied 20" in output
 
   test "JNull produces no output":
     var b = newMetricsBuilder()

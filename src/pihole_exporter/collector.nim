@@ -30,6 +30,20 @@ proc collectSummary*(b: var MetricsBuilder, data: JsonNode) =
     b.addGauge("pihole_query_frequency", "DNS queries per second",
       q{"frequency"}.getFloat())
 
+    # Query types
+    let queryTypes = q.getOrDefault("types")
+    if queryTypes != nil and queryTypes.kind == JObject:
+      for key, val in queryTypes:
+        b.addGauge("pihole_query_type", "Query count by type", val.getFloat(),
+          {"type": key})
+
+    # Reply types
+    let replyTypes = q.getOrDefault("replies")
+    if replyTypes != nil and replyTypes.kind == JObject:
+      for key, val in replyTypes:
+        b.addGauge("pihole_reply_type", "Reply count by type", val.getFloat(),
+          {"type": key})
+
   let clients = data.getOrDefault("clients")
   if clients != nil and clients.kind == JObject:
     b.addGauge("pihole_clients_ever_seen", "Total clients ever seen",
@@ -38,21 +52,7 @@ proc collectSummary*(b: var MetricsBuilder, data: JsonNode) =
       clients{"active"}.getFloat())
 
   b.addGauge("pihole_domains_blocked", "Domains on blocklist (gravity)",
-    data{"gravity_size"}.getFloat())
-
-  # Query types
-  let queryTypes = data.getOrDefault("query_types")
-  if queryTypes != nil and queryTypes.kind == JObject:
-    for key, val in queryTypes:
-      b.addGauge("pihole_query_type", "Query count by type", val.getFloat(),
-        {"type": key})
-
-  # Reply types
-  let replyTypes = data.getOrDefault("reply_types")
-  if replyTypes != nil and replyTypes.kind == JObject:
-    for key, val in replyTypes:
-      b.addGauge("pihole_reply_type", "Reply count by type", val.getFloat(),
-        {"type": key})
+    data{"gravity", "domains_being_blocked"}.getFloat())
 
 proc collectBlocking*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
@@ -112,13 +112,13 @@ proc collectUpstreams*(b: var MetricsBuilder, data: JsonNode) =
       let ip = item{"ip"}.getStr("")
       let name = item{"name"}.getStr("")
       let count = item{"count"}.getFloat()
-      let responseTime = item{"response_time"}.getFloat()
+      let responseTime = item{"statistics", "response"}.getFloat()
       if ip != "":
         b.addGauge("pihole_upstream_queries",
           "Queries sent to upstream", count,
           {"upstream": ip, "name": name})
         b.addGauge("pihole_upstream_response_time_seconds",
-          "Upstream avg response time", responseTime / 1000.0,
+          "Upstream avg response time", responseTime,
           {"upstream": ip, "name": name})
 
 proc collectDhcp*(b: var MetricsBuilder, data: JsonNode) =
@@ -144,29 +144,31 @@ proc collectNetwork*(b: var MetricsBuilder, data: JsonNode) =
 
 proc collectVersion*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
-  let ftl = data{"version"}.getStr(data{"ftl"}.getStr(""))
-  let web = data{"web"}.getStr("")
-  let core = data{"core"}.getStr("")
+  let ftl = data{"version", "ftl", "local", "version"}.getStr("")
+  let web = data{"version", "web", "local", "version"}.getStr("")
+  let core = data{"version", "core", "local", "version"}.getStr("")
   b.addGauge("pihole_version_info", "Version info (value=1)", 1.0,
     {"ftl": ftl, "web": web, "core": core})
 
-proc collectSystem*(b: var MetricsBuilder, system, sensors: JsonNode) =
-  if system.kind != JNull:
-    b.addGauge("pihole_system_uptime_seconds", "System uptime in seconds",
-      system{"uptime"}.getFloat())
+proc collectSystem*(b: var MetricsBuilder, systemResp, sensors: JsonNode) =
+  if systemResp.kind != JNull:
+    let system = systemResp.getOrDefault("system")
+    if system != nil and system.kind == JObject:
+      b.addGauge("pihole_system_uptime_seconds", "System uptime in seconds",
+        system{"uptime"}.getFloat())
 
-    let mem = system.getOrDefault("memory")
-    if mem != nil and mem.kind == JObject:
-      let used = mem{"ram"}.getOrDefault("used")
-      let total = mem{"ram"}.getOrDefault("total")
-      if used != nil and total != nil and total.getFloat() > 0:
-        b.addGauge("pihole_system_memory_usage_percent", "Memory usage percentage",
-          used.getFloat() / total.getFloat() * 100.0)
+      let mem = system.getOrDefault("memory")
+      if mem != nil and mem.kind == JObject:
+        let used = mem{"ram"}.getOrDefault("used")
+        let total = mem{"ram"}.getOrDefault("total")
+        if used != nil and total != nil and total.getFloat() > 0:
+          b.addGauge("pihole_system_memory_usage_percent", "Memory usage percentage",
+            used.getFloat() / total.getFloat() * 100.0)
 
-    let cpu = system.getOrDefault("cpu")
-    if cpu != nil and cpu.kind == JObject:
-      b.addGauge("pihole_system_cpu_usage_percent", "CPU usage percentage",
-        cpu{"percent_used"}.getFloat())
+      let cpu = system.getOrDefault("cpu")
+      if cpu != nil and cpu.kind == JObject:
+        b.addGauge("pihole_system_cpu_usage_percent", "CPU usage percentage",
+          cpu{"%cpu"}.getFloat())
 
   if sensors.kind != JNull:
     let temps = sensors.getOrDefault("sensors")
@@ -222,9 +224,11 @@ proc collectMessages*(b: var MetricsBuilder, data: JsonNode) =
 
 proc collectFtl*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
+  let ftl = data.getOrDefault("ftl")
+  if ftl == nil or ftl.kind != JObject: return
   b.addGauge("pihole_ftl_pid", "FTL process ID",
-    data{"pid"}.getFloat())
-  let db = data.getOrDefault("database")
+    ftl{"pid"}.getFloat())
+  let db = ftl.getOrDefault("database")
   if db != nil and db.kind == JObject:
     b.addGauge("pihole_ftl_database_gravity", "Gravity database entries",
       db{"gravity"}.getFloat())
@@ -234,8 +238,10 @@ proc collectFtl*(b: var MetricsBuilder, data: JsonNode) =
       db{"lists"}.getFloat())
     b.addGauge("pihole_ftl_database_clients", "Clients in database",
       db{"clients"}.getFloat())
-    b.addGauge("pihole_ftl_database_domains", "Domains in database",
-      db{"domains"}.getFloat())
+    b.addGauge("pihole_ftl_database_domains_allowed", "Allowed domains in database",
+      db{"domains", "allowed", "total"}.getFloat())
+    b.addGauge("pihole_ftl_database_domains_denied", "Denied domains in database",
+      db{"domains", "denied", "total"}.getFloat())
 
 proc collect*(c: PiholeClient): Future[string] {.async.} =
   ## Fetch all endpoints and return Prometheus text format output.
