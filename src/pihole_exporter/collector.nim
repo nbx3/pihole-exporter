@@ -11,7 +11,7 @@ proc safeGet(c: PiholeClient, path: string): Future[JsonNode] {.async.} =
     warn(&"Failed to fetch {path}: {getCurrentExceptionMsg()}")
     result = newJNull()
 
-proc collectSummary(b: var MetricsBuilder, data: JsonNode) =
+proc collectSummary*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let q = data.getOrDefault("queries")
   if q != nil and q.kind == JObject:
@@ -54,13 +54,13 @@ proc collectSummary(b: var MetricsBuilder, data: JsonNode) =
       b.addGauge("pihole_reply_type", "Reply count by type", val.getFloat(),
         {"type": key})
 
-proc collectBlocking(b: var MetricsBuilder, data: JsonNode) =
+proc collectBlocking*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let enabled = data{"blocking"}.getStr("") == "enabled"
   b.addGauge("pihole_blocking_enabled", "Whether blocking is enabled (1=yes, 0=no)",
     if enabled: 1.0 else: 0.0)
 
-proc collectTopDomains(b: var MetricsBuilder, permitted, blocked: JsonNode) =
+proc collectTopDomains*(b: var MetricsBuilder, permitted, blocked: JsonNode) =
   if permitted.kind != JNull:
     let domains = permitted.getOrDefault("domains")
     if domains != nil and domains.kind == JArray:
@@ -81,7 +81,7 @@ proc collectTopDomains(b: var MetricsBuilder, permitted, blocked: JsonNode) =
           b.addGauge("pihole_top_ads", "Top blocked domain count",
             count, {"domain": domain})
 
-proc collectTopClients(b: var MetricsBuilder, clients, blockedClients: JsonNode) =
+proc collectTopClients*(b: var MetricsBuilder, clients, blockedClients: JsonNode) =
   if clients.kind != JNull:
     let arr = clients.getOrDefault("clients")
     if arr != nil and arr.kind == JArray:
@@ -104,7 +104,7 @@ proc collectTopClients(b: var MetricsBuilder, clients, blockedClients: JsonNode)
           b.addGauge("pihole_top_sources_blocked", "Top blocked client count",
             count, {"client": ip, "name": name})
 
-proc collectUpstreams(b: var MetricsBuilder, data: JsonNode) =
+proc collectUpstreams*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let upstreams = data.getOrDefault("upstreams")
   if upstreams != nil and upstreams.kind == JArray:
@@ -121,7 +121,7 @@ proc collectUpstreams(b: var MetricsBuilder, data: JsonNode) =
           "Upstream avg response time", responseTime / 1000.0,
           {"upstream": ip, "name": name})
 
-proc collectDhcp(b: var MetricsBuilder, data: JsonNode) =
+proc collectDhcp*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let leases = data.getOrDefault("leases")
   if leases != nil and leases.kind == JArray:
@@ -135,14 +135,14 @@ proc collectDhcp(b: var MetricsBuilder, data: JsonNode) =
       b.addGauge("pihole_dhcp_lease", "DHCP lease info (value=1)", 1.0,
         {"ip": ip, "mac": mac, "hostname": hostname, "expires": expires})
 
-proc collectNetwork(b: var MetricsBuilder, data: JsonNode) =
+proc collectNetwork*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let devices = data.getOrDefault("devices")
   if devices != nil and devices.kind == JArray:
     b.addGauge("pihole_network_devices_total", "Discovered network devices",
       devices.len.float)
 
-proc collectVersion(b: var MetricsBuilder, data: JsonNode) =
+proc collectVersion*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let ftl = data{"version"}.getStr(data{"ftl"}.getStr(""))
   let web = data{"web"}.getStr("")
@@ -150,7 +150,7 @@ proc collectVersion(b: var MetricsBuilder, data: JsonNode) =
   b.addGauge("pihole_version_info", "Version info (value=1)", 1.0,
     {"ftl": ftl, "web": web, "core": core})
 
-proc collectSystem(b: var MetricsBuilder, system, sensors: JsonNode) =
+proc collectSystem*(b: var MetricsBuilder, system, sensors: JsonNode) =
   if system.kind != JNull:
     b.addGauge("pihole_system_uptime_seconds", "System uptime in seconds",
       system{"uptime"}.getFloat())
@@ -177,7 +177,7 @@ proc collectSystem(b: var MetricsBuilder, system, sensors: JsonNode) =
       b.addGauge("pihole_system_temperature_celsius", "CPU temperature",
         sensors{"cpu_temp"}.getFloat())
 
-proc collectDatabase(b: var MetricsBuilder, data: JsonNode) =
+proc collectDatabase*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   let db = data.getOrDefault("database")
   if db != nil and db.kind == JObject:
@@ -191,7 +191,7 @@ proc collectDatabase(b: var MetricsBuilder, data: JsonNode) =
     b.addGauge("pihole_database_queries", "Queries in database",
       data{"queries"}.getFloat())
 
-proc collectCounts(b: var MetricsBuilder, groups, lists, allowDomains, denyDomains: JsonNode) =
+proc collectCounts*(b: var MetricsBuilder, groups, lists, allowDomains, denyDomains: JsonNode) =
   if groups.kind != JNull:
     let arr = groups.getOrDefault("groups")
     if arr != nil and arr.kind == JArray:
@@ -215,12 +215,12 @@ proc collectCounts(b: var MetricsBuilder, groups, lists, allowDomains, denyDomai
       b.addGauge("pihole_domains_deny_total", "Denylisted domains",
         arr.len.float)
 
-proc collectMessages(b: var MetricsBuilder, data: JsonNode) =
+proc collectMessages*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   b.addGauge("pihole_messages_total", "System messages/warnings",
     data{"count"}.getFloat())
 
-proc collectFtl(b: var MetricsBuilder, data: JsonNode) =
+proc collectFtl*(b: var MetricsBuilder, data: JsonNode) =
   if data.kind == JNull: return
   b.addGauge("pihole_ftl_pid", "FTL process ID",
     data{"pid"}.getFloat())
