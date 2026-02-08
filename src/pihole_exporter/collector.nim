@@ -242,6 +242,7 @@ proc collect*(c: PiholeClient): Future[string] {.async.} =
   let startTime = epochTime()
   var success = 1.0
   var b = newMetricsBuilder()
+  debug("Starting metrics collection")
 
   try:
     # Fire off all requests concurrently
@@ -304,10 +305,15 @@ proc collect*(c: PiholeClient): Future[string] {.async.} =
     b.collectMessages(messages)
 
   except:
-    warn(&"Collection error: {getCurrentExceptionMsg()}")
+    error(&"Collection failed: {getCurrentExceptionMsg()}")
     success = 0.0
 
   let duration = epochTime() - startTime
+  if success == 1.0:
+    info(&"Scrape completed in {duration:.3f}s")
+  else:
+    warn(&"Scrape completed with errors in {duration:.3f}s")
+
   b.addGauge("pihole_exporter_scrape_duration_seconds",
     "Time taken to scrape Pi-hole", duration)
   b.addGauge("pihole_exporter_scrape_success",

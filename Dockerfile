@@ -1,4 +1,4 @@
-FROM nimlang/nim:2.2.4-alpine AS build
+FROM nimlang/nim:2.2.6-alpine AS build
 
 WORKDIR /app
 COPY src/ src/

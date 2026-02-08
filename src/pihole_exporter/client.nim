@@ -32,6 +32,7 @@ proc authenticate*(c: PiholeClient) {.async.} =
   ## POST /api/auth to obtain a session SID.
   let url = &"{c.baseUrl}/api/auth"
   let body = $(%*{"password": c.password})
+  info(&"Authenticating with Pi-hole at {c.baseUrl}")
   let client = c.newHttpClient()
   defer: client.close()
   let resp = await client.request(url, httpMethod = HttpPost,
@@ -39,18 +40,22 @@ proc authenticate*(c: PiholeClient) {.async.} =
     headers = newHttpHeaders({"Content-Type": "application/json"}))
   let respBody = await resp.body
   if resp.code != Http200:
+    error(&"Authentication failed: HTTP {resp.code}")
     raise newException(IOError, &"Auth failed: HTTP {resp.code} - {respBody}")
   let j = parseJson(respBody)
   let session = j.getOrDefault("session")
   if session.isNil or session.kind != JObject:
+    error(&"Authentication response missing session object")
     raise newException(IOError, &"Auth response missing session: {respBody}")
   let validity = session.getOrDefault("validity")
   if validity.isNil or validity.kind != JInt or validity.getInt() <= 0:
+    error(&"Authentication failed: invalid session validity")
     raise newException(IOError, &"Auth failed: invalid session validity: {respBody}")
   c.sid = session{"sid"}.getStr("")
   if c.sid == "":
+    error(&"Authentication response missing SID")
     raise newException(IOError, &"Auth response missing SID: {respBody}")
-  debug(&"Authenticated with Pi-hole, SID: {c.sid[0..7]}...")
+  info(&"Authenticated with Pi-hole, SID: {c.sid[0..7]}...")
 
 proc get*(c: PiholeClient, path: string): Future[JsonNode] {.async.} =
   ## Authenticated GET request. Re-authenticates on 401.
@@ -67,7 +72,7 @@ proc get*(c: PiholeClient, path: string): Future[JsonNode] {.async.} =
 
   # Re-auth on 401
   if resp.code == Http401:
-    debug("Got 401, re-authenticating...")
+    warn(&"Got 401 for {path}, re-authenticating...")
     await c.authenticate()
     let retryClient = c.newHttpClient()
     defer: retryClient.close()
@@ -76,6 +81,7 @@ proc get*(c: PiholeClient, path: string): Future[JsonNode] {.async.} =
     body = await resp.body
 
   if resp.code != Http200:
-    raise newException(IOError, &"API request failed: {path} → HTTP {resp.code}")
+    error(&"API request failed: {path} — HTTP {resp.code}")
+    raise newException(IOError, &"API request failed: {path} — HTTP {resp.code}")
 
   result = parseJson(body)

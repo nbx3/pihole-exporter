@@ -44,8 +44,8 @@ proc main() {.async.} =
   let logger = newConsoleLogger(fmtStr = "$datetime $levelname ")
   addHandler(logger)
 
+  info("Pi-hole Exporter starting")
   let cfg = loadConfig()
-  info(&"Pi-hole Exporter starting")
   info(&"  Pi-hole URL: {cfg.piholeUrl}")
   info(&"  Exporter port: {cfg.exporterPort}")
   info(&"  Skip TLS verify: {cfg.skipTlsVerify}")
@@ -56,18 +56,27 @@ proc main() {.async.} =
   var server = newAsyncHttpServer()
 
   proc handler(req: Request) {.async.} =
-    case req.url.path
-    of "/metrics":
-      let body = await piholeClient.collect()
-      await req.respond(Http200, body,
-        newHttpHeaders({"Content-Type": "text/plain; version=0.0.4; charset=utf-8"}))
-    of "/health":
-      await req.respond(Http200, "OK")
-    of "/":
-      await req.respond(Http200, landingPage,
-        newHttpHeaders({"Content-Type": "text/html"}))
-    else:
-      await req.respond(Http404, "Not Found")
+    debug(&"{req.reqMethod} {req.url.path}")
+    try:
+      case req.url.path
+      of "/metrics":
+        let body = await piholeClient.collect()
+        await req.respond(Http200, body,
+          newHttpHeaders({"Content-Type": "text/plain; version=0.0.4; charset=utf-8"}))
+      of "/health":
+        await req.respond(Http200, "OK")
+      of "/":
+        await req.respond(Http200, landingPage,
+          newHttpHeaders({"Content-Type": "text/html"}))
+      else:
+        warn(&"404 {req.reqMethod} {req.url.path}")
+        await req.respond(Http404, "Not Found")
+    except:
+      error(&"Error handling {req.reqMethod} {req.url.path}: {getCurrentExceptionMsg()}")
+      try:
+        await req.respond(Http500, "Internal Server Error")
+      except:
+        error(&"Failed to send error response: {getCurrentExceptionMsg()}")
 
   info(&"Listening on :{cfg.exporterPort}")
   server.listen(Port(cfg.exporterPort))
