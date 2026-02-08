@@ -1,8 +1,7 @@
 # Nim build artifacts
 nimcache/
 src/nimcache/
-pihole_exporter
-src/pihole_exporter_bin
+/pihole_exporter
 *.exe
 *.o
 *.a

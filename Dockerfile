@@ -1,4 +1,4 @@
-FROM nimlang/nim:2.2.2-alpine AS builder
+FROM nimlang/nim:2.2.6-alpine-regular AS builder
 
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static
 
