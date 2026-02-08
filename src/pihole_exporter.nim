@@ -54,6 +54,7 @@ proc main() {.async.} =
     of "FATAL": lvlFatal
     of "NONE": lvlNone
     else: lvlInfo
+  setLogFilter(level)
   let logger = newConsoleLogger(level, fmtStr = "$datetime $levelname ")
   addHandler(logger)
 
