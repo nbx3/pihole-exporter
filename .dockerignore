@@ -1,0 +1,6 @@
+.git
+.github
+.claude
+nimcache
+pihole_exporter
+*.md

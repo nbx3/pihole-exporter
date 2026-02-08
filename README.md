@@ -2,7 +2,32 @@
 
 A comprehensive Prometheus exporter for **Pi-hole v6**, written in Nim with zero external dependencies.
 
-Queries 20 Pi-hole API endpoints to expose ~40 metrics — covering everything from core DNS stats to DHCP leases, network devices, system health, and database info. Built as a drop-in replacement for [`ekofr/pihole-exporter`](https://github.com/eko/pihole-exporter), which only covers ~7 endpoints.
+Queries 19 Pi-hole API endpoints concurrently to expose ~40 metrics — covering everything from core DNS stats to DHCP leases, network devices, system health, and database info.
+
+## Architecture
+
+This exporter covers **Pi-hole application metrics only** — DNS query stats, blocking status, top domains/clients, upstream performance, DHCP leases, gravity lists, FTL internals, etc.
+
+It does **not** replace system-level monitoring. For host metrics (CPU, memory, disk, network interfaces), run [node_exporter](https://github.com/prometheus/node_exporter) on the Pi-hole host.
+
+A typical setup with [vmagent](https://docs.victoriametrics.com/vmagent/) (or Prometheus) scraping both:
+
+```
+┌─────────────────────────────────────────┐
+│  Pi-hole host                           │
+│                                         │
+│  ┌──────────────────┐  ┌─────────────┐  │
+│  │ pihole-exporter  │  │node_exporter│  │
+│  │ :9617/metrics    │  │:9100/metrics│  │
+│  └────────┬─────────┘  └──────┬──────┘  │
+│           │                   │         │
+└───────────┼───────────────────┼─────────┘
+            │                   │
+       ┌────▼───────────────────▼────┐
+       │  vmagent / prometheus       │
+       │  (scrape both targets)      │
+       └─────────────────────────────┘
+```
 
 ## Metrics
 
@@ -18,6 +43,7 @@ Queries 20 Pi-hole API endpoints to expose ~40 metrics — covering everything f
 | **Version** | `/api/info/version` | `pihole_version_info{ftl,web,core}` |
 | **System** | `/api/info/system`, `/api/info/sensors` | `pihole_system_uptime_seconds`, `pihole_system_memory_usage_percent`, `pihole_system_cpu_usage_percent`, `pihole_system_temperature_celsius` |
 | **Database** | `/api/info/database` | `pihole_database_size_bytes`, `pihole_database_queries` |
+| **FTL** | `/api/info/ftl` | `pihole_ftl_pid`, `pihole_ftl_database_gravity`, `pihole_ftl_database_groups`, `pihole_ftl_database_lists`, `pihole_ftl_database_clients`, `pihole_ftl_database_domains` |
 | **Management** | `/api/groups`, `/api/lists`, `/api/domains/*` | `pihole_groups_total`, `pihole_gravity_lists_total`, `pihole_domains_allow_total`, `pihole_domains_deny_total` |
 | **Messages** | `/api/info/messages/count` | `pihole_messages_total` |
 | **Exporter** | — | `pihole_exporter_scrape_duration_seconds`, `pihole_exporter_scrape_success` |
@@ -29,7 +55,7 @@ Queries 20 Pi-hole API endpoints to expose ~40 metrics — covering everything f
 ```yaml
 services:
   pihole-exporter:
-    image: ghcr.io/your-user/pihole-exporter:latest
+    image: ghcr.io/nbx3/pihole-exporter:latest
     environment:
       PIHOLE_URL: https://pihole.local
       PIHOLE_PASSWORD: your-password
@@ -88,6 +114,18 @@ docker build -t pihole-exporter .
 ```
 
 The Dockerfile produces a statically-linked binary on Alpine with SSL support.
+
+### CI/CD
+
+A GitHub Actions workflow (`.github/workflows/docker.yml`) automatically builds and pushes multi-arch Docker images (`linux/amd64` and `linux/arm64`) to GHCR on every push to `main` or version tag (`v*`).
+
+Tag a release to publish versioned images:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+# produces: ghcr.io/nbx3/pihole-exporter:1.0.0, :1.0, :1, :latest
+```
 
 ## Prometheus Config
 
