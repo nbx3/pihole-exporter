@@ -131,7 +131,7 @@ nim c -r -d:ssl tests/test_collector.nim
 
 ### CI/CD
 
-A GitHub Actions workflow (`.github/workflows/docker.yml`) automatically builds and pushes multi-arch Docker images (`linux/amd64` and `linux/arm64`) to GHCR on every push to `main` or version tag (`v*`).
+A GitHub Actions workflow (`.github/workflows/docker.yml`) automatically builds and pushes multi-arch Docker images (`linux/amd64` and `linux/arm64`) to GHCR on every push to `main` or version tag (`v*`). Tagged builds also create a GitHub release with auto-generated notes.
 
 Tag a release to publish versioned images:
 
@@ -139,6 +139,7 @@ Tag a release to publish versioned images:
 git tag v1.0.0
 git push origin v1.0.0
 # produces: ghcr.io/nbx3/pihole-exporter:1.0.0, :1.0, :1, :latest
+# also creates a GitHub release for v1.0.0
 ```
 
 ## Prometheus Config
@@ -152,7 +153,9 @@ scrape_configs:
 
 ## Grafana
 
-These metrics are compatible with existing Pi-hole Grafana dashboards. For full coverage of the additional metrics (DHCP, network, system, database), you'll want to extend your dashboard or build a new one.
+A ready-to-use dashboard is included at [`grafana/dashboard.json`](grafana/dashboard.json). Import it into Grafana via **Dashboards → Import → Upload JSON file**, and select your Prometheus datasource when prompted.
+
+It covers all exported metrics: overview stats, query traffic and frequency, query/reply type breakdowns, top domains and clients, upstream distribution and response times, DHCP leases, system health (CPU, memory, temperature), database stats, gravity/group/domain counts, and exporter scrape status.
 
 ## License
 
