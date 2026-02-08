@@ -245,6 +245,9 @@ proc collect*(c: PiholeClient): Future[string] {.async.} =
   debug("Starting metrics collection")
 
   try:
+    # Authenticate once before firing concurrent requests
+    await c.authenticate()
+
     # Fire off all requests concurrently
     let
       fSummary = c.safeGet("/api/stats/summary")

@@ -12,6 +12,7 @@ type
     password*: string
     sid: string
     skipTlsVerify: bool
+    authenticating: bool
 
 proc newHttpClient(c: PiholeClient): AsyncHttpClient =
   when defined(ssl):
@@ -30,6 +31,8 @@ proc newPiholeClient*(baseUrl, password: string, skipTlsVerify: bool = false): P
 
 proc authenticate*(c: PiholeClient) {.async.} =
   ## POST /api/auth to obtain a session SID.
+  c.authenticating = true
+  defer: c.authenticating = false
   let url = &"{c.baseUrl}/api/auth"
   let body = $(%*{"password": c.password})
   info(&"Authenticating with Pi-hole at {c.baseUrl}")
@@ -61,7 +64,12 @@ proc get*(c: PiholeClient, path: string): Future[JsonNode] {.async.} =
   ## Authenticated GET request. Re-authenticates on 401.
   ## Each call creates its own HTTP client for safe concurrent use.
   if c.sid == "":
-    await c.authenticate()
+    if not c.authenticating:
+      await c.authenticate()
+    else:
+      # Another coroutine is already authenticating — wait for it
+      while c.authenticating:
+        await sleepAsync(50)
 
   let url = &"{c.baseUrl}{path}"
   let client = c.newHttpClient()
@@ -72,8 +80,14 @@ proc get*(c: PiholeClient, path: string): Future[JsonNode] {.async.} =
 
   # Re-auth on 401
   if resp.code == Http401:
-    warn(&"Got 401 for {path}, re-authenticating...")
-    await c.authenticate()
+    if not c.authenticating:
+      warn(&"Got 401 for {path}, re-authenticating...")
+      await c.authenticate()
+    else:
+      # Another coroutine is already re-authenticating — wait for it
+      debug(&"Got 401 for {path}, waiting for ongoing re-auth...")
+      while c.authenticating:
+        await sleepAsync(50)
     let retryClient = c.newHttpClient()
     defer: retryClient.close()
     let retryHeaders = newHttpHeaders({"sid": c.sid})
