@@ -2,7 +2,7 @@
 
 A comprehensive Prometheus exporter for **Pi-hole v6**, written in Nim with zero external dependencies.
 
-Queries 19 Pi-hole API endpoints concurrently to expose ~40 metrics — covering everything from core DNS stats to DHCP leases, network devices, system health, and database info. Authenticates once per scrape to avoid rate limiting.
+Queries 19 Pi-hole API endpoints concurrently to expose ~40 metrics — covering everything from core DNS stats to DHCP leases, network devices, system health, and database info. Reuses a single API session across scrapes and caches responses to avoid rate limiting.
 
 ## Architecture
 
@@ -86,6 +86,7 @@ All configuration is via environment variables:
 | `PIHOLE_PORT` | `443` or `80` | Pi-hole port (defaults to `443` for HTTPS URLs, `80` for HTTP; appended if no port present) |
 | `EXPORTER_PORT` | `9617` | Metrics server listen port |
 | `SKIP_TLS_VERIFY` | `false` | Skip TLS certificate verification |
+| `CACHE_TTL` | `30` | Seconds to cache metrics responses (`0` to disable) |
 | `LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `NONE` |
 
 ## Endpoints

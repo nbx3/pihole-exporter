@@ -1,7 +1,7 @@
 ## Pi-hole Prometheus Exporter — comprehensive exporter for Pi-hole v6.
 ## Configured via environment variables, serves Prometheus metrics on /metrics.
 
-import std/[asyncdispatch, asynchttpserver, os, strutils, strformat, logging]
+import std/[asyncdispatch, asynchttpserver, os, strutils, strformat, logging, times]
 import pihole_exporter/[client, collector]
 
 type
@@ -11,6 +11,7 @@ type
     piholePort: int
     exporterPort: int
     skipTlsVerify: bool
+    cacheTtl: float
 
 proc loadConfig(): Config =
   let url = getEnv("PIHOLE_URL", "http://localhost")
@@ -22,6 +23,7 @@ proc loadConfig(): Config =
   let piholePort = getEnv("PIHOLE_PORT", defaultPort).parseInt()
   let exporterPort = getEnv("EXPORTER_PORT", "9617").parseInt()
   let skipTls = getEnv("SKIP_TLS_VERIFY", "false").toLowerAscii() in ["true", "1", "yes"]
+  let cacheTtl = getEnv("CACHE_TTL", "30").parseFloat()
 
   # Build base URL: append port to URL if not already present
   var baseUrl = url.strip(chars = {'/'})
@@ -34,6 +36,7 @@ proc loadConfig(): Config =
     piholePort: piholePort,
     exporterPort: exporterPort,
     skipTlsVerify: skipTls,
+    cacheTtl: cacheTtl,
   )
 
 const landingPage = """<!DOCTYPE html>
@@ -59,18 +62,30 @@ proc main() {.async.} =
   info(&"  Pi-hole URL: {cfg.piholeUrl}")
   info(&"  Exporter port: {cfg.exporterPort}")
   info(&"  Skip TLS verify: {cfg.skipTlsVerify}")
+  info(&"  Cache TTL: {cfg.cacheTtl}s")
 
   let piholeClient = newPiholeClient(cfg.piholeUrl, cfg.piholePassword,
     cfg.skipTlsVerify)
 
   var server = newAsyncHttpServer()
+  var cachedMetrics = ""
+  var cachedAt = 0.0
 
   proc handler(req: Request) {.async.} =
     debug(&"{req.reqMethod} {req.url.path}")
     try:
       case req.url.path
       of "/metrics":
-        let body = await piholeClient.collect()
+        let now = epochTime()
+        let body = if cfg.cacheTtl > 0 and cachedMetrics.len > 0 and
+            now - cachedAt < cfg.cacheTtl:
+          debug("Serving cached metrics")
+          cachedMetrics
+        else:
+          let fresh = await piholeClient.collect()
+          cachedMetrics = fresh
+          cachedAt = now
+          fresh
         await req.respond(Http200, body,
           newHttpHeaders({"Content-Type": "text/plain; version=0.0.4; charset=utf-8"}))
       of "/health":
