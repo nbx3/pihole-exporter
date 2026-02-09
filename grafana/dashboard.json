@@ -250,7 +250,7 @@
             "fillOpacity": 20,
             "lineWidth": 1,
             "drawStyle": "line",
-            "gradientMode": "scheme",
+            "gradientMode": "opacity",
             "spanNulls": true
           },
           "color": { "mode": "fixed", "fixedColor": "blue" },
@@ -260,7 +260,7 @@
       },
       "options": {
         "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "hidden" }
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom" }
       }
     },
 
@@ -775,7 +775,7 @@
       },
       "options": {
         "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "hidden" }
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom" }
       }
     },
 
@@ -1057,7 +1057,7 @@
       },
       "options": {
         "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "hidden" }
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom" }
       }
     }
   ]
