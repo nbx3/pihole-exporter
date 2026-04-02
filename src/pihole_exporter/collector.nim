@@ -251,50 +251,28 @@ proc collect*(c: PiholeClient): Future[string] {.async.} =
   debug("Starting metrics collection")
 
   try:
-    # Fire off all requests concurrently
-    # (get() handles auth lazily: authenticates when sid is empty, re-auths on 401)
+    # Fetch endpoints sequentially to avoid overwhelming FTL's civetweb server.
+    # Concurrent requests can trigger a segfault in civetweb-worker (FTL v6.5).
     let
-      fSummary = c.safeGet("/api/stats/summary")
-      fBlocking = c.safeGet("/api/dns/blocking")
-      fTopPermitted = c.safeGet("/api/stats/top_domains?blocked=false&count=10")
-      fTopBlocked = c.safeGet("/api/stats/top_domains?blocked=true&count=10")
-      fTopClients = c.safeGet("/api/stats/top_clients?blocked=false&count=10")
-      fTopBlockedClients = c.safeGet("/api/stats/top_clients?blocked=true&count=10")
-      fUpstreams = c.safeGet("/api/stats/upstreams")
-      fDhcp = c.safeGet("/api/dhcp/leases")
-      fNetwork = c.safeGet("/api/network/devices")
-      fVersion = c.safeGet("/api/info/version")
-      fSystem = c.safeGet("/api/info/system")
-      fSensors = c.safeGet("/api/info/sensors")
-      fDatabase = c.safeGet("/api/info/database")
-      fFtl = c.safeGet("/api/info/ftl")
-      fMessages = c.safeGet("/api/info/messages/count")
-      fGroups = c.safeGet("/api/groups")
-      fLists = c.safeGet("/api/lists")
-      fAllowDomains = c.safeGet("/api/domains/allow")
-      fDenyDomains = c.safeGet("/api/domains/deny")
-
-    # Await all results
-    let
-      summary = await fSummary
-      blocking = await fBlocking
-      topPermitted = await fTopPermitted
-      topBlocked = await fTopBlocked
-      topClients = await fTopClients
-      topBlockedClients = await fTopBlockedClients
-      upstreams = await fUpstreams
-      dhcp = await fDhcp
-      network = await fNetwork
-      version = await fVersion
-      system = await fSystem
-      sensors = await fSensors
-      database = await fDatabase
-      ftl = await fFtl
-      messages = await fMessages
-      groups = await fGroups
-      lists = await fLists
-      allowDomains = await fAllowDomains
-      denyDomains = await fDenyDomains
+      summary = await c.safeGet("/api/stats/summary")
+      blocking = await c.safeGet("/api/dns/blocking")
+      topPermitted = await c.safeGet("/api/stats/top_domains?blocked=false&count=10")
+      topBlocked = await c.safeGet("/api/stats/top_domains?blocked=true&count=10")
+      topClients = await c.safeGet("/api/stats/top_clients?blocked=false&count=10")
+      topBlockedClients = await c.safeGet("/api/stats/top_clients?blocked=true&count=10")
+      upstreams = await c.safeGet("/api/stats/upstreams")
+      dhcp = await c.safeGet("/api/dhcp/leases")
+      network = await c.safeGet("/api/network/devices")
+      version = await c.safeGet("/api/info/version")
+      system = await c.safeGet("/api/info/system")
+      sensors = await c.safeGet("/api/info/sensors")
+      database = await c.safeGet("/api/info/database")
+      ftl = await c.safeGet("/api/info/ftl")
+      messages = await c.safeGet("/api/info/messages/count")
+      groups = await c.safeGet("/api/groups")
+      lists = await c.safeGet("/api/lists")
+      allowDomains = await c.safeGet("/api/domains/allow")
+      denyDomains = await c.safeGet("/api/domains/deny")
 
     # Build metrics
     b.collectSummary(summary)
