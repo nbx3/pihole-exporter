@@ -2,7 +2,7 @@
 
 A comprehensive Prometheus exporter for **Pi-hole v6**, written in Nim with zero external dependencies.
 
-Queries 19 Pi-hole API endpoints concurrently to expose ~40 metrics — covering everything from core DNS stats to DHCP leases, network devices, system health, and database info. Reuses a single API session across scrapes and caches responses to avoid rate limiting.
+Queries 19 Pi-hole API endpoints sequentially to expose ~40 metrics — covering everything from core DNS stats to DHCP leases, network devices, system health, and database info. Reuses a single API session across scrapes and caches responses to avoid rate limiting.
 
 ## Architecture
 
